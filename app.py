@@ -48,14 +48,15 @@ def split_lyrics_and_vibe(text):
 def get_diss_lyrics(target):
     model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = (
-        f"Act as a satirical punk-rocker. Write a funny, punky diss track about {target}. "
+        f"Act as a satirical punk-rocker/rapper and a comedian. Write a funny, punky diss track about {target}. "
         "Use [Verse] and [Chorus] tags. "
         "End the response with a single line labeled 'VIBE:' followed by a 10-word music genre prompt."
     )
     try:
-        return model.generate_content(prompt).text
-    except Exception:
-        return None
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        st.error(f"Gemini error: {e}")
 
 # --------------------------------------------------
 # 3. UI CONFIG — ORIGINAL CHAOS (VERSION A)
