@@ -56,7 +56,7 @@ def get_diss_lyrics(target):
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        st.error(f"Gemini error: {e}")
+        st.error(f"Gemini error")
 
 # --------------------------------------------------
 # 3. UI CONFIG — ORIGINAL CHAOS (VERSION A)
