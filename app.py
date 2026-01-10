@@ -254,7 +254,7 @@ window.addEventListener("scroll", () => {
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# 4. UI LOGIC
+# 4. UI LOGIC (FINAL — CONDITIONAL AUDIO)
 # --------------------------------------------------
 
 st.markdown("""
@@ -265,30 +265,66 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-target = st.text_input("NAME YOUR TARGET:", placeholder="Who deserves the noise?")
+prompt_input = st.text_input(
+    "DROP A NAME, MOOD, OR THOUGHT:",
+    placeholder="rage, boredom, system, noise, freedom..."
+)
 
-if st.button("IGNITE DISS ⚡"):
-    if not target.strip():
-        st.warning("Say a name. Punk needs a target.")
+# Initialize state flags safely
+if "generation_attempted" not in st.session_state:
+    st.session_state.generation_attempted = False
+if "gemini_failed" not in st.session_state:
+    st.session_state.gemini_failed = False
+if "lyrics" not in st.session_state:
+    st.session_state.lyrics = None
+
+# --- MAIN ACTION ---
+if st.button("IGNITE PUNK ⚡"):
+    st.session_state.generation_attempted = True
+    st.session_state.gemini_failed = False
+    st.session_state.lyrics = None
+
+    raw = get_diss_lyrics(
+        prompt_input.strip() if prompt_input.strip() else "the system"
+    )
+
+    if raw:
+        lyrics, vibe = split_lyrics_and_vibe(raw)
+        st.session_state.lyrics = lyrics
+        st.session_state.vibe = vibe
     else:
-        raw = get_diss_lyrics(target)
-        if raw:
-            lyrics, vibe = split_lyrics_and_vibe(raw)
-            st.session_state.lyrics = lyrics
-            st.session_state.vibe = vibe
-        else:
-            st.error("Gemini failed. Try again later.")
+        st.session_state.gemini_failed = True
 
-if "lyrics" in st.session_state:
+# --------------------------------------------------
+# RESULT AREA (ONLY AFTER BUTTON CLICK)
+# --------------------------------------------------
+
+# Case 1: Lyrics generated
+if st.session_state.generation_attempted and st.session_state.lyrics:
     st.markdown(
         f'<div class="lyrics-display">{st.session_state.lyrics}</div>',
         unsafe_allow_html=True
     )
 
-    st.markdown("### 🔊 CHAOS MODE (Non-AI Demo Audio)")
-    st.caption("Randomized, preloaded punk/noise loops. No AI audio generation.")
+    st.markdown("### 🔊 TURN IT UP")
+    st.caption("Lyrics locked in. Now let the noise speak.")
 
-    if st.button("🔥 RELEASE FEEDBACK"):
+    if st.button("🎸 GENERATE PUNK AUDIO"):
+        audio_file = get_random_demo_audio()
+        if audio_file:
+            st.audio(str(audio_file))
+        else:
+            st.error("No demo audio files found in /audio.")
+
+# Case 2: Gemini failed → fallback
+elif st.session_state.generation_attempted and st.session_state.gemini_failed:
+    st.error(
+        "⚠️ The lyricist didn’t show up today.\n\n"
+        "Gemini’s probably taking a smoke break.\n\n"
+        "Till it crawls back, the amps are still hot."
+    )
+
+    if st.button("🔥 PLAY RANDOM PUNK NOISE"):
         audio_file = get_random_demo_audio()
         if audio_file:
             st.audio(str(audio_file))
