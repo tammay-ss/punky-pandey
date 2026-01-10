@@ -4,6 +4,12 @@ import random
 import google.generativeai as genai
 from dotenv import load_dotenv
 from pathlib import Path
+TEXT_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3-flash"
+]
 
 # --------------------------------------------------
 # 1. CONFIGURATION
@@ -45,18 +51,48 @@ def split_lyrics_and_vibe(text):
         return lyrics.strip(), vibe.strip()
     return text.strip(), "punk rock raw distorted chaotic fast aggressive"
 
-def get_diss_lyrics(target):
-    model = genai.GenerativeModel("gemini-2.0-flash")
+def get_diss_lyrics(prompt_input):
     prompt = (
-        f"Act as a satirical punk-rocker/rapper and a comedian. Write a funny, punky diss track about {target}. "
+        f"Act as a satirical punk-rocker. Write a loud, rebellious punk track about {prompt_input}. "
         "Use [Verse] and [Chorus] tags. "
+        "Make it chaotic, sarcastic, and raw. "
         "End the response with a single line labeled 'VIBE:' followed by a 10-word music genre prompt."
     )
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        st.error(f"Gemini error")
+
+    last_error = None
+
+    for model_name in TEXT_MODELS:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+
+            # Optional debug log (remove later if you want)
+            st.caption(f"🧠 Lyrics generated using `{model_name}`")
+
+            return response.text
+
+        except Exception as e:
+            error_text = str(e)
+            last_error = error_text
+
+            # If quota/rate issue → try next model
+            if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+                continue
+            else:
+                # Non-quota error → stop immediately
+                break
+
+    # All models failed
+    st.error(
+        "⚠️ All lyric engines are tapped out.\n\n"
+        "The words are dead. The noise is not."
+    )
+
+    # Optional: log last error for debugging
+    st.error(f"Last Gemini error: {last_error}")
+
+    return None
+
 
 # --------------------------------------------------
 # 3. UI CONFIG — ORIGINAL CHAOS (VERSION A)
