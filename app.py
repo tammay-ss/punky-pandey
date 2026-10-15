@@ -1,15 +1,9 @@
 import streamlit as st
 import os
 import random
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from pathlib import Path
-TEXT_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3-flash"
-]
 
 # --------------------------------------------------
 # 1. CONFIGURATION
@@ -28,8 +22,57 @@ except Exception:
 if not GEMINI_KEY:
     GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
-if GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+DEFAULT_MODEL = "gemini-3.6-flash"
+DEFAULT_FALLBACK_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+
+
+def get_text_models():
+    primary = None
+    try:
+        if "GEMINI_MODEL" in st.secrets:
+            primary = st.secrets["GEMINI_MODEL"]
+    except Exception:
+        pass
+
+    if not primary:
+        primary = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+
+    fallbacks_str = None
+    try:
+        if "GEMINI_FALLBACK_MODELS" in st.secrets:
+            fallbacks_str = st.secrets["GEMINI_FALLBACK_MODELS"]
+    except Exception:
+        pass
+
+    if fallbacks_str is None:
+        fallbacks_str = os.getenv("GEMINI_FALLBACK_MODELS", DEFAULT_FALLBACK_MODELS)
+
+    fallbacks = [m.strip() for m in fallbacks_str.split(",") if m.strip()]
+    return list(dict.fromkeys([primary] + fallbacks))
+
+
+TEXT_MODELS = get_text_models()
+GEMINI_MODEL = TEXT_MODELS[0]
+
+gemini_client = genai.Client(api_key=GEMINI_KEY) if GEMINI_KEY else None
+
+
+def get_gemini_client():
+    global gemini_client
+    if gemini_client:
+        return gemini_client
+    key = GEMINI_KEY
+    if not key:
+        try:
+            if "GEMINI_API_KEY" in st.secrets:
+                key = st.secrets["GEMINI_API_KEY"]
+        except Exception:
+            pass
+    if not key:
+        key = os.getenv("GEMINI_API_KEY")
+    if key:
+        gemini_client = genai.Client(api_key=key)
+    return gemini_client
 
 # --------------------------------------------------
 # 2. CORE LOGIC
@@ -59,12 +102,24 @@ def get_diss_lyrics(prompt_input):
         "End the response with a single line labeled 'VIBE:' followed by a 10-word music genre prompt."
     )
 
-    last_error = None
+    client = get_gemini_client()
+    if not client:
+        last_error = "GEMINI_API_KEY is not set. Please configure it in .env or st.secrets."
+        st.error(
+            "⚠️ All lyric engines are tapped out.\n\n"
+            "The words are dead. The noise is not."
+        )
+        st.error(f"Last Gemini error: {last_error}")
+        return None
 
-    for model_name in TEXT_MODELS:
+    last_error = None
+    models_to_try = get_text_models()
+    for model_name in models_to_try:
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
 
             # Optional debug log (remove later if you want)
             st.caption(f"🧠 Lyrics generated using `{model_name}`")
