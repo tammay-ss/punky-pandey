@@ -22,8 +22,8 @@ except Exception:
 if not GEMINI_KEY:
     GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
-DEFAULT_MODEL = "gemini-3.6-flash"
-DEFAULT_FALLBACK_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_FALLBACK_MODELS = "gemini-3.6-flash,gemini-3.1-flash-lite"
 
 
 def get_text_models():
@@ -130,11 +130,19 @@ def get_diss_lyrics(prompt_input):
             error_text = str(e)
             last_error = error_text
 
-            # If quota/rate issue → try next model
-            if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+            # If quota/rate issue or temporary high demand (503/UNAVAILABLE) → try next model
+            is_transient = any(
+                code in error_text for code in [
+                    "429", "RESOURCE_EXHAUSTED",
+                    "503", "UNAVAILABLE", "high demand",
+                    "500", "INTERNAL",
+                    "504", "DEADLINE_EXCEEDED"
+                ]
+            )
+            if is_transient:
                 continue
             else:
-                # Non-quota error → stop immediately
+                # Non-transient error → stop immediately
                 break
 
     # All models failed
